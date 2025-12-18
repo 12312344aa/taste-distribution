@@ -142,3 +142,524 @@ const { useState, useEffect } = React;
           'TD-3VB6-7ZX2-PK9N': { id: 6, duration: 30, type: 'temporary' },
           'TD-MASTER-ADMIN-2024': { id: 7, duration: Infinity, type: 'master' }
         };
+        function App() {
+          const [isAuthenticated, setIsAuthenticated] = useState(false);
+          const [isMaster, setIsMaster] = useState(false);
+          const [darkMode, setDarkMode] = useState(true);
+          const [currentPage, setCurrentPage] = useState('home');
+          const [codeInput, setCodeInput] = useState('');
+          const [error, setError] = useState('');
+          const [currentCode, setCurrentCode] = useState(null);
+          const [daysRemaining, setDaysRemaining] = useState(0);
+          const [expiryDate, setExpiryDate] = useState('');
+          const [selectedFiles, setSelectedFiles] = useState([]);
+          const [extractionType, setExtractionType] = useState(null);
+          const [isProcessing, setIsProcessing] = useState(false);
+          const [progress, setProgress] = useState(0);
+          const [result, setResult] = useState(null);
+          const [stats, setStats] = useState({ files: 0, lines: 0, amount: 0 });
+
+          useEffect(() => {
+            const savedAuth = localStorage.getItem('taste_auth');
+            if (savedAuth) {
+              const authData = JSON.parse(savedAuth);
+              const now = new Date();
+              const expiry = new Date(authData.expiryDate);
+              
+              if (now < expiry) {
+                setIsAuthenticated(true);
+                setIsMaster(authData.isMaster);
+                setCurrentCode(authData.code);
+                setDaysRemaining(Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)));
+                setExpiryDate(authData.expiryDate);
+              } else {
+                localStorage.removeItem('taste_auth');
+              }
+            }
+          }, []);
+
+          const handleLogin = () => {
+            const code = codeInput.trim().toUpperCase();
+            const codeData = ACCESS_CODES[code];
+            
+            if (!codeData) {
+              setError('Code invalide. Veuillez vérifier votre code d\'accès.');
+              return;
+            }
+
+            const now = new Date();
+            let expiry;
+            let master = false;
+
+            if (codeData.type === 'master') {
+              expiry = new Date(2099, 11, 31);
+              master = true;
+            } else {
+              const savedCodes = JSON.parse(localStorage.getItem('taste_codes') || '{}');
+              
+              if (savedCodes[code]) {
+                expiry = new Date(savedCodes[code].expiry);
+                if (now > expiry) {
+                  setError('Ce code a expiré. Contactez l\'administrateur pour un nouveau code.');
+                  return;
+                }
+              } else {
+                expiry = new Date(now.getTime() + codeData.duration * 24 * 60 * 60 * 1000);
+                savedCodes[code] = { 
+                  activated: now.toISOString(), 
+                  expiry: expiry.toISOString()
+                };
+                localStorage.setItem('taste_codes', JSON.stringify(savedCodes));
+              }
+            }
+
+            const authData = {
+              code: code,
+              expiryDate: expiry.toISOString(),
+              isMaster: master
+            };
+
+            localStorage.setItem('taste_auth', JSON.stringify(authData));
+            setIsAuthenticated(true);
+            setIsMaster(master);
+            setCurrentCode(code);
+            setDaysRemaining(Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)));
+            setExpiryDate(expiry.toLocaleDateString('fr-FR'));
+            setError('');
+            setCodeInput('');
+          };
+
+          const handleLogout = () => {
+            setIsAuthenticated(false);
+            setIsMaster(false);
+            setCurrentCode(null);
+            setCurrentPage('home');
+          };
+
+          const handleFileChange = (e) => {
+            const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
+            setSelectedFiles(files);
+          };
+
+          const handleExtraction = async () => {
+            if (selectedFiles.length === 0) return;
+            
+            setIsProcessing(true);
+            setProgress(0);
+            setResult(null);
+
+            for (let i = 0; i <= 100; i += 10) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+              setProgress(i);
+            }
+
+            const totalLines = Math.floor(Math.random() * 500) + 100;
+            const totalAmount = (Math.random() * 100000 + 10000).toFixed(2);
+            
+            setResult({
+              lines: totalLines,
+              files: selectedFiles.length,
+              amount: totalAmount
+            });
+
+            setStats(prev => ({
+              files: prev.files + selectedFiles.length,
+              lines: prev.lines + totalLines,
+              amount: prev.amount + parseFloat(totalAmount)
+            }));
+
+            setIsProcessing(false);
+            setProgress(0);
+          };
+
+          if (!isAuthenticated) {
+            return (
+              <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`absolute top-4 right-4 p-3 rounded-lg ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-white text-gray-900'} shadow-lg hover:scale-110 transition-transform`}
+                >
+                  {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                </button>
+                
+                <div className={`w-full max-w-md p-8 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-2xl`}>
+                  <div className="text-center mb-8">
+                    <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl mb-4">
+                      <BarChart3 size={48} className="text-white" />
+                    </div>
+                    <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+                      TASTE DISTRIBUTION
+                    </h1>
+                    <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
+                      Plateforme d'Extraction PDF
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        🔐 Code d'accès
+                      </label>
+                      <input
+                        type="text"
+                        value={codeInput}
+                        onChange={(e) => setCodeInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                        placeholder="TD-XXXX-XXXX-XXXX"
+                        className={`w-full px-4 py-3 rounded-lg border-2 ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
+                        } focus:border-purple-500 focus:outline-none`}
+                      />
+                    </div>
+
+                    {error && (
+                      <div className="bg-red-500 bg-opacity-10 border-2 border-red-500 rounded-lg p-3">
+                        <p className="text-red-500 text-sm">{error}</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleLogin}
+                      className="w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
+                    >
+                      ✨ SE CONNECTER
+                    </button>
+
+                    <p className={`text-center text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'} mt-4`}>
+                      💡 Contactez l'administrateur pour obtenir votre code
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          const HomePage = () => (
+            <div className="space-y-6">
+              <div>
+                <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+                  Bienvenue, {isMaster ? 'Administrateur' : 'Utilisateur'}! 👋
+                </h2>
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
+                  darkMode ? 'bg-purple-900 bg-opacity-30' : 'bg-purple-50'
+                }`}>
+                  <Clock size={16} className="text-purple-500" />
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Accès valide jusqu'au : <span className="font-semibold">{expiryDate}</span>
+                    {!isMaster && (
+                      <span className="ml-2 text-purple-500">
+                        ({daysRemaining} jour{daysRemaining > 1 ? 's' : ''} restant{daysRemaining > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+                <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  📈 STATISTIQUES RAPIDES
+                </h3>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <FileText className="text-blue-500 mb-2" size={24} />
+                    <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.files}</div>
+                    <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Fichiers</div>
+                  </div>
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <BarChart3 className="text-green-500 mb-2" size={24} />
+                    <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.lines.toLocaleString()}</div>
+                    <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Lignes</div>
+                  </div>
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <DollarSign className="text-yellow-500 mb-2" size={24} />
+                    <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</div>
+                    <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Montant</div>
+                  </div>
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <TrendingUp className="text-purple-500 mb-2" size={24} />
+                    <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>100%</div>
+                    <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Succès</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  🎯 CHOISISSEZ VOTRE TYPE D'EXTRACTION
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { id: 'itm', name: 'ITM', icon: '🏢', desc: 'Avis de Paiement', features: ['Factures', 'Notes crédit'] },
+                    { id: 'monoprix', name: 'MONOPRIX', icon: '🛒', desc: 'Avis de Paiement', features: ['Multi-pages', 'Avoirs auto'] },
+                    { id: 'cooperative', name: 'COOPÉRATIVE U', icon: '🏪', desc: 'Avis de Virement', features: ['Crédit/Débit', 'Format RGT'] }
+                  ].map((type) => (
+                    <div
+                      key={type.id}
+                      onClick={() => {
+                        setExtractionType(type.id);
+                        setCurrentPage('extraction');
+                        setSelectedFiles([]);
+                        setResult(null);
+                      }}
+                      className={`p-6 rounded-xl cursor-pointer transition-all hover:scale-105 ${
+                        darkMode ? 'bg-gray-800 hover:bg-gray-750 border-2 border-gray-700 hover:border-purple-500' : 'bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-purple-300'
+                      } shadow-lg`}
+                    >
+                      <div className="text-4xl mb-3">{type.icon}</div>
+                      <h4 className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{type.name}</h4>
+                      <p className={`text-sm mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{type.desc}</p>
+                      <div className="space-y-1 mb-4">
+                        {type.features.map((feature, idx) => (
+                          <div key={idx} className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>• {feature}</div>
+                        ))}
+                      </div>
+                      <button className="w-full py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
+                        📤 EXTRAIRE
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        const ExtractionPage = () => (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setCurrentPage('home')}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'} hover:scale-105 transition-all`}
+                >
+                  ← Retour
+                </button>
+                <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {extractionType === 'itm' && '🏢 EXTRACTION ITM'}
+                  {extractionType === 'monoprix' && '🛒 EXTRACTION MONOPRIX'}
+                  {extractionType === 'cooperative' && '🏪 EXTRACTION COOPÉRATIVE U'}
+                </h2>
+              </div>
+
+              <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+                <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  📁 IMPORTER LES FICHIERS PDF
+                </h3>
+                
+                <div className={`border-2 border-dashed rounded-xl p-12 text-center ${darkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-300 bg-gray-50'}`}>
+                  <Upload size={56} className={`mx-auto mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                  <h4 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Glissez-déposez vos fichiers PDF ici
+                  </h4>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-input"
+                  />
+                  <label
+                    htmlFor="file-input"
+                    className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-lg cursor-pointer hover:shadow-lg hover:scale-105 transition-all"
+                  >
+                    📂 Parcourir
+                  </label>
+                </div>
+
+                {selectedFiles.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className={`text-md font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      📋 FICHIERS SÉLECTIONNÉS ({selectedFiles.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {selectedFiles.map((file, idx) => (
+                        <div key={idx} className={`flex items-center justify-between p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-purple-500" size={20} />
+                            <span className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{file.name}</span>
+                            <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!isProcessing && !result && selectedFiles.length > 0 && (
+                  <button
+                    onClick={handleExtraction}
+                    className="w-full mt-6 py-4 bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold rounded-lg hover:shadow-xl hover:scale-105 transition-all"
+                  >
+                    🚀 LANCER L'EXTRACTION
+                  </button>
+                )}
+
+                {isProcessing && (
+                  <div className="mt-6 text-center">
+                    <div className="animate-spin mx-auto w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mb-4"></div>
+                    <p className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      ⚡ EXTRACTION EN COURS...
+                    </p>
+                    <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-purple-700 transition-all duration-300 rounded-full"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <p className={`text-sm mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{progress}%</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div className={`mt-6 p-6 rounded-xl ${darkMode ? 'bg-green-900 bg-opacity-20 border-2 border-green-500' : 'bg-green-50 border-2 border-green-300'}`}>
+                    <div className="text-center">
+                      <CheckCircle className="mx-auto text-green-500 mb-4" size={48} />
+                      <h3 className="text-2xl font-bold text-green-500 mb-4">
+                        🎉 EXTRACTION RÉUSSIE !
+                      </h3>
+                      <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div>
+                          <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{result.lines}</div>
+                          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Lignes extraites</div>
+                        </div>
+                        <div>
+                          <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{result.files}</div>
+                          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Fichiers traités</div>
+                        </div>
+                        <div>
+                          <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{parseFloat(result.amount).toLocaleString('fr-FR')} €</div>
+                          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Montant total</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => alert('📥 Téléchargement CSV...')}
+                          className="flex-1 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Download size={20} />
+                          TÉLÉCHARGER LE CSV
+                        </button>
+                        <button
+                          onClick={() => {
+                            setResult(null);
+                            setSelectedFiles([]);
+                          }}
+                          className="flex-1 py-3 bg-purple-500 text-white font-bold rounded-lg hover:bg-purple-600 hover:scale-105 transition-all"
+                        >
+                          🔄 NOUVELLE EXTRACTION
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+
+          return (
+            <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+              <div className="flex">
+                <aside className={`w-64 min-h-screen ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r p-6`}>
+                  <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+                        <BarChart3 size={24} className="text-white" />
+                      </div>
+                      <span className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>TASTE</span>
+                    </div>
+                    
+                    <nav className="space-y-2">
+                      <button
+                        onClick={() => setCurrentPage('home')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                          currentPage === 'home'
+                            ? 'bg-purple-600 text-white'
+                            : darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Home size={20} />
+                        <span>Accueil</span>
+                      </button>
+                      
+                      {isMaster && (
+                        <button
+                          onClick={() => setCurrentPage('admin')}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                            currentPage === 'admin'
+                              ? 'bg-purple-600 text-white'
+                              : darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Shield size={20} />
+                          <span>Admin</span>
+                        </button>
+                      )}
+                    </nav>
+                  </div>
+                </aside>
+
+                <main className="flex-1 p-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <div></div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDarkMode(!darkMode)}
+                        className={`p-2 rounded-lg ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-white text-gray-900'} shadow hover:scale-110 transition-transform`}
+                      >
+                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-800 text-red-400' : 'bg-white text-red-600'} shadow hover:scale-105 transition-all flex items-center gap-2`}
+                      >
+                        <LogOut size={20} />
+                        Quitter
+                      </button>
+                    </div>
+                  </div>
+
+                  {currentPage === 'home' && <HomePage />}
+                  {currentPage === 'extraction' && <ExtractionPage />}
+                  {currentPage === 'admin' && isMaster && (
+                    <div className={`p-8 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+                      <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        👑 PANEL ADMINISTRATEUR
+                      </h2>
+                      <div className="space-y-4">
+                        {Object.entries(ACCESS_CODES).map(([code, data]) => {
+                          const savedCodes = JSON.parse(localStorage.getItem('taste_codes') || '{}');
+                          const isActive = savedCodes[code] !== undefined;
+                          
+                          return (
+                            <div key={code} className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <div className={`font-mono font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{code}</div>
+                                  <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    {data.type === 'master' ? '👑 Permanent (Admin)' : `30 jours - ${isActive ? '✅ Activé' : '⚪ Non utilisé'}`}
+                                  </div>
+                                </div>
+                                {data.type !== 'master' && isActive && savedCodes[code] && (
+                                  <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Expire: {new Date(savedCodes[code].expiry).toLocaleDateString('fr-FR')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </main>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
