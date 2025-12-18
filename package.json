@@ -1,0 +1,56 @@
+{
+  "name": "taste-distribution",
+  "version": "1.0.0",
+  "description": "Plateforme d'Extraction PDF - TASTE DISTRIBUTION",
+  "main": "public/electron.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "pdf",
+    "extraction",
+    "electron"
+  ],
+  "author": "TASTE Distribution",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "build": {
+    "appId": "com.taste.distribution",
+    "productName": "TASTE Distribution",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "public/**/*",
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
